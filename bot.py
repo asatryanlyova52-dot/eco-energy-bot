@@ -18,8 +18,8 @@ logger = logging.getLogger("eco-energy-bot")
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_API_BASE = os.getenv("OPENAI_API_BASE") or None
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+OPENAI_API_BASE = (os.getenv("OPENAI_API_BASE") or "").strip() or None
+OPENAI_MODEL = (os.getenv("OPENAI_MODEL", "gpt-5.5") or "gpt-5.5").strip()
 client = AsyncOpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_BASE) if OPENAI_API_KEY else None
 ai_history: Dict[int, List[dict]] = defaultdict(list)
 sessions: Dict[int, dict] = {}
