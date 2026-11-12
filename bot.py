@@ -214,15 +214,14 @@ async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = await client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}, *ai_history[user_id][-8:], {"role": "user", "content": question}],
-            temperature=0.2,
-            max_tokens=2500,
+            max_completion_tokens=2500,
         )
         answer = response.choices[0].message.content
         if not answer:
             response = await client.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT + " Պատասխանիր միայն հայերեն տառերով։"}, {"role": "user", "content": question}],
-                max_tokens=2500,
+                max_completion_tokens=2500,
             )
             answer = response.choices[0].message.content
         bad_words = ("կորիզ", "շարժումայն", "standby", "միացրեք կամ ամբողջությամբ անջատեք")
@@ -230,7 +229,7 @@ async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = await client.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT + " Քո նախորդ պատասխանը սխալ էր։ Վերագրիր այն միայն հայերեն տառերով։"}, {"role": "user", "content": question}],
-                max_tokens=2500,
+                max_completion_tokens=2500,
             )
             answer = response.choices[0].message.content
         if not answer:
