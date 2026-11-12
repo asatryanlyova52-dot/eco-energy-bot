@@ -1,6 +1,8 @@
 import logging
 import os
 import random
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 from collections import defaultdict
 from typing import Dict, List
 
@@ -297,5 +299,30 @@ def build_app():
     return app
 
 
+def start_health_server():
+    """Expose a small HTTP endpoint so Render can keep this web service healthy."""
+    port = int(os.getenv("PORT", "10000"))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path not in ("/", "/health"):
+                self.send_error(404)
+                return
+            body = b"EcoEnergyBot is running"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format, *_args):
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    Thread(target=server.serve_forever, daemon=True).start()
+    logger.info("Health endpoint listening on port %s", port)
+
+
 if __name__ == "__main__":
+    start_health_server()
     build_app().run_polling(allowed_updates=Update.ALL_TYPES)
