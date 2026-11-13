@@ -1,7 +1,9 @@
 import logging
 import os
 import random
+import threading
 from collections import defaultdict
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, List
 
 from dotenv import load_dotenv
@@ -53,6 +55,13 @@ FAST_REPLIES = {
     "երբ է տեղի ունեցել ավարայրի ճակատամարտը": "Ավարայրի ճակատամարտը տեղի է ունեցել 451 թվականի մայիսի 26-ին։ Ճակատամարտը տեղի է ունեցել Վասպուրականում՝ Տղմուտ գետի ափին։",
     "ավարայրի ճակատամարտ": "Ավարայրի ճակատամարտը տեղի է ունեցել 451 թվականի մայիսի 26-ին։ Այն գլխավորել է Վարդան Մամիկոնյանը։",
     "վերականգնվող էներգիայի տեսակներ": "Վերականգնվող էներգիայի հիմնական տեսակներն են՝ արևային, քամու, ջրային, երկրաջերմային և կենսազանգվածից ստացվող էներգիաները։ Դրանք ստացվում են բնության մեջ շարունակաբար վերականգնվող աղբյուրներից։",
+    "ոնց ես": "Լավ եմ, շնորհակալություն։ Ես այստեղ եմ, որ օգնեմ էներգախնայողության հարցերում։",
+    "ինչ կա արա": "Ամեն ինչ լավ է։ Ասա՝ ինչ հարց ունես, և կփորձեմ օգնել պարզ ու հասկանալի ձևով։",
+}
+
+VERIFIED_REPLIES = {
+    "avarayr": "Ավարայրի ճակատամարտը տեղի է ունեցել 451 թվականի մայիսի 26-ին։ Այն գլխավորել է Վարդան Մամիկոնյանը։",
+    "renewable": "Վերականգնվող էներգիայի հիմնական տեսակներն են՝ արևային, քամու, ջրային, երկրաջերմային և կենսազանգվածից ստացվող էներգիաները։",
 }
 
 INFO_CARDS = [
@@ -215,6 +224,12 @@ async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     question = update.message.text.strip()
     normalized = " ".join(question.lower().replace("՞", "").replace("?", "").split())
+    if "ավարայր" in normalized or "ավառայր" in normalized:
+        await update.message.reply_text(VERIFIED_REPLIES["avarayr"], reply_markup=main_keyboard())
+        return
+    if "վերականգնվող էներգ" in normalized or "վերականգնվող էներգիայի տեսակ" in normalized:
+        await update.message.reply_text(VERIFIED_REPLIES["renewable"], reply_markup=main_keyboard())
+        return
     if normalized in FAST_REPLIES:
         await update.message.reply_text(FAST_REPLIES[normalized], reply_markup=main_keyboard())
         return
@@ -310,5 +325,25 @@ def build_app():
     return app
 
 
+def start_health_server():
+    """Keep Render Web Service healthy while Telegram is polled in the background."""
+    port = int(os.getenv("PORT", "10000"))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"EcoEnergyBot is running")
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    logger.info("Health endpoint listening on port %s", port)
+
+
 if __name__ == "__main__":
+    start_health_server()
     build_app().run_polling(allowed_updates=Update.ALL_TYPES)
