@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import random
@@ -32,14 +33,15 @@ MAIN_BUTTONS = [
     ["🤖 ԱԲ օգնական", "❓ Օգնություն"],
 ]
 
-SYSTEM_PROMPT = """Դու EcoEnergyBot-ի հայերեն, փաստերը չհորինող օգնականն ես։
+SYSTEM_PROMPT = """Դու EcoEnergyBot-ի հայերեն, բնական և փաստերը չհորինող ընդհանուր օգնականն ես։
 ՊԱՏԱՍԽԱՆԻՐ ՄԻԱՅՆ ՊԱՐԶ ԱՐԵՎԵԼԱՀԱՅԵՐԵՆՈՎ։ Մի օգտագործիր անգլերեն նախադասություններ կամ անգլերեն բառեր։
 Փոխարենը գրիր հայերեն՝ «սպասման ռեժիմ», «էներգախնայող լամպ», «էլեկտրաէներգիա»։ Միայն չափման միավորները
 կարող են մնալ՝ Վտ, կՎտժ, °C։ Պատասխանիր հենց օգտատիրոջ հարցին, մի շեղվիր և մի հորինիր հարցի իմաստը։
 Եթե հարցը պատմական կամ գիտական փաստի մասին է և վստահ չես, գրիր՝ «Չեմ ուզում սխալ տեղեկություն տալ։ Կարող եմ պատասխանել միայն այն փաստերին, որոնցում վստահ եմ»։
 Մի հորինիր աղբյուր, ամսաթիվ, անուն կամ տերմին։ Արտաքին աղբյուր ստուգելու հնարավորություն չունես, ուստի անորոշ փաստը ներկայացրու որպես անորոշ, ոչ թե որպես հաստատված։
-Եթե հարցը անորոշ է, մեկ կարճ ճշտող հարց տուր։ Օգնիր խնայել էլեկտրաէներգիա, ջուր և ջեռուցման ծախսեր՝
-առանց վտանգավոր էլեկտրատեխնիկական խորհուրդների։ Պատասխանը պահիր պարզ, կարճ և գործնական՝ 2-5 քայլով։
+Պատասխանիր օգտատիրոջ ցանկացած սովորական հարցի՝ պատմություն, գիտություն, կրթություն, առօրյա թեմաներ կամ էներգախնայողություն։
+Եթե հարցը անորոշ է, մեկ կարճ ճշտող հարց տուր։ Էլեկտրականության, ջեռուցման կամ առողջության վտանգավոր հարցերում մի տուր ռիսկային հրահանգներ։
+Պատասխանը պահիր պարզ, կարճ և գործնական՝ սովորաբար 2-5 նախադասությամբ կամ քայլով։
 Օգտագործիր բնական խոսակցական ձև՝ «փոխիր», «օգտագործիր», «անջատիր», ոչ թե ծանր պաշտոնական ձևեր։
 Մի հորինիր բառեր և մի թարգմանիր բառացի։ «Շարժման սենսոր» գրիր, ոչ թե «շարժումայն անջատիչ»։
 Պատասխանից առաջ ստուգիր, որ ոչ մի լատինատառ կամ ռուսերեն տառ չես օգտագործել։ Եթե վստահ չես հայերեն ձևակերպմանը, գրիր ավելի կարճ նախադասությամբ։"""
@@ -57,6 +59,8 @@ FAST_REPLIES = {
     "վերականգնվող էներգիայի տեսակներ": "Վերականգնվող էներգիայի հիմնական տեսակներն են՝ արևային, քամու, ջրային, երկրաջերմային և կենսազանգվածից ստացվող էներգիաները։ Դրանք ստացվում են բնության մեջ շարունակաբար վերականգնվող աղբյուրներից։",
     "ոնց ես": "Լավ եմ, շնորհակալություն։ Ես այստեղ եմ, որ օգնեմ էներգախնայողության հարցերում։",
     "ինչ կա արա": "Ամեն ինչ լավ է։ Ասա՝ ինչ հարց ունես, և կփորձեմ օգնել պարզ ու հասկանալի ձևով։",
+    "երբ է ծնվել Հովհաննես Թումանյանը": "Հովհաննես Թումանյանը ծնվել է 1869 թվականի փետրվարի 19-ին՝ Լոռու Դսեղ գյուղում։",
+    "հովհաննես թումանյան": "Հովհաննես Թումանյանը ծնվել է 1869 թվականի փետրվարի 19-ին՝ Լոռու Դսեղ գյուղում։",
 }
 
 VERIFIED_REPLIES = {
@@ -235,27 +239,27 @@ async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
     try:
-        response = await client.chat.completions.create(
+        response = await asyncio.wait_for(client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}, *ai_history[user_id][-8:], {"role": "user", "content": question}],
             temperature=0.2,
             max_tokens=2500,
-        )
+        ), timeout=12)
         answer = response.choices[0].message.content
         if not answer:
-            response = await client.chat.completions.create(
+            response = await asyncio.wait_for(client.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT + " Պատասխանիր միայն հայերեն տառերով։"}, {"role": "user", "content": question}],
                 max_tokens=2500,
-            )
+            ), timeout=12)
             answer = response.choices[0].message.content
         bad_words = ("կորիզ", "շարժումայն", "standby", "միացրեք կամ ամբողջությամբ անջատեք")
         if answer and (has_foreign_letters(answer) or any(word in answer.lower() for word in bad_words)):
-            response = await client.chat.completions.create(
+            response = await asyncio.wait_for(client.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT + " Քո նախորդ պատասխանը սխալ էր։ Վերագրիր այն միայն հայերեն տառերով։"}, {"role": "user", "content": question}],
                 max_tokens=2500,
-            )
+            ), timeout=12)
             answer = response.choices[0].message.content
         if not answer or has_foreign_letters(answer):
             answer = "Չեմ ուզում սխալ տեղեկություն տալ։ Խնդրում եմ հարցը գրիր ավելի պարզ, կամ հարցրու էներգախնայողության մասին։"
@@ -318,7 +322,7 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def build_app():
     if not BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is missing")
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).concurrent_updates(True).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
